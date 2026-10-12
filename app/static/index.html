@@ -72,8 +72,14 @@ async function approvazioni(){
   if(!ds.length)return h("div",{class:"card mute"},"Nessuna bozza in attesa. Niente viene pubblicato senza la tua approvazione.");
   return h("div",{},...ds.map(d=>{const ta=h("textarea",{style:"min-height:160px"});ta.value=d.text;
     return h("div",{class:"card"},h("div",{class:"row"},h("h3",{},d.kind+" #"+d.id),h("span",{class:"mute"},(d.target_url||"nuovo post")+" · "+ta.value.length+" car.")),ta,
-      h("div",{class:"row"},h("button",{class:"p",onclick:async()=>{if(!confirm("Pubblicare ora?"))return;const r=await api(`/api/drafts/${d.id}/approve`,"POST",{text:ta.value});alert(r.backend==="manual"?r.result.message:"Pubblicato via "+r.backend);render()}},"Approva e pubblica"),
+      d.kind==="post"?imgBox(d):"",
+      d.kind==="post"?h("div",{},h("label",{},"Programma (opzionale, ora locale)"),h("input",{type:"datetime-local",id:"when-"+d.id})):"",
+      h("div",{class:"row"},h("button",{class:"p",onclick:async()=>{if(!confirm("Pubblicare ora?"))return;const w=$("#when-"+d.id);const r=await api(`/api/drafts/${d.id}/approve`,"POST",{text:ta.value,scheduled_time:w&&w.value?new Date(w.value).toISOString():null});alert(r.backend==="manual"?r.result.message:"Pubblicato via "+r.backend);render()}},"Approva e pubblica"),
       h("button",{class:"s",onclick:async()=>{await api(`/api/drafts/${d.id}/reject`,"POST");render()}},"Scarta")))}))}
+
+function imgBox(d){
+  const pr=h("input",{placeholder:"Descrivi l'immagine da allegare"}),out=h("div",{class:"mute"},d.media_url?"Immagine allegata: "+d.media_url:"");
+  return h("div",{},pr,h("button",{class:"s",style:"margin-top:6px",onclick:async()=>{if(!pr.value)return;out.textContent="Generazione…";try{const r=await api(`/api/drafts/${d.id}/image`,"POST",{prompt:pr.value});out.textContent=r.url?"Immagine allegata: "+r.url:r.message}catch(e){out.textContent=e.message}}},"Genera immagine"),out)}
 
 async function jobs(){
   const js=await api("/api/jobs");

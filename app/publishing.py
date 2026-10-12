@@ -6,7 +6,7 @@ import time
 from .store import Store
 
 
-def approve(store: Store, draft_id: int, text: str | None = None) -> dict:
+def approve(store: Store, draft_id: int, text: str | None = None, scheduled_time: str | None = None) -> dict:
     d = store.get("drafts", draft_id)
     if not d:
         raise KeyError("draft not found")
@@ -25,6 +25,11 @@ def approve(store: Store, draft_id: int, text: str | None = None) -> dict:
         kwargs["post_urn"] = parsed["post_urn"]
         if kind == "reply":
             kwargs["parent_comment"] = parsed["comment_urn"]
+    if kind == "post":
+        if d.get("media_url"):
+            kwargs["media_urls"] = [d["media_url"]]
+        if scheduled_time:
+            kwargs["scheduled_time"] = scheduled_time          # ISO 8601, UTC
     result = lib.publish(kind, body, url or "https://www.linkedin.com/feed/", **kwargs)
     store.update("drafts", draft_id, text=body, status="approved", result=result, updated=time.time())
     return {"draft": store.get("drafts", draft_id), "backend": lib.active_backend(), "result": result}
@@ -32,3 +37,17 @@ def approve(store: Store, draft_id: int, text: str | None = None) -> dict:
 
 def reject(store: Store, draft_id: int) -> None:
     store.update("drafts", draft_id, status="rejected", updated=time.time())
+
+
+def illustrate(store: Store, draft_id: int, prompt: str, kind: str = "post") -> dict:
+    """Generate an image for a pending post draft (Pixfaro, or a manual prompt block)."""
+    d = store.get("drafts", draft_id)
+    if not d or d["status"] != "pending":
+        raise KeyError("pending draft not found")
+    if d["kind"] != "post":
+        raise ValueError("images attach to posts only")
+    import lib
+    img = lib.illustrate(prompt, kind=kind)
+    if img.get("url"):
+        store.update("drafts", draft_id, media_url=img["url"], updated=time.time())
+    return img

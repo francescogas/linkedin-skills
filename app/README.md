@@ -47,11 +47,16 @@ Set `LLM_CHAIN` (comma list, tried in order) or let it follow what is configured
 
 Reading LinkedIn posts uses Apify when `APIFY_TOKEN` is set, otherwise paste the text. Publishing uses Publora when configured, otherwise the approval card returns a copy-paste block (see the root `.env.example`).
 
+## Data, images and scheduling
+
+- With `APIFY_TOKEN`, the post, comment, engager and recent-comment workflows fetch their input from a LinkedIn URL (`sources.py`); without it, paste the text. Fetched data is fenced as untrusted and capped at 12k characters.
+- A pending post draft can get an image (`PIXFARO_TOKEN`, otherwise you get the prompt to run yourself) and a publish time; both go to Publora on approval.
+
 ## Running it around the clock
 
 - State lives in `app/data/studio.db` (override with `LINKEDIN_APP_DATA`). A restart re-queues running jobs and resumes after the last finished step.
 - To serve beyond localhost set `APP_HOST` and `APP_TOKEN`; a non-loopback bind without a token is refused. Put TLS in front of it.
-- Run `python3 -m app worker` under systemd, Docker or `launchd` for unattended operation.
+- Run `python3 -m app worker` under systemd or `launchd`, or use the bundled `Dockerfile` and `docker-compose.yml` (`APP_TOKEN=... docker compose up -d`; state lives in the `studio-data` volume; keep TLS in a reverse proxy in front).
 
 ## Safety
 

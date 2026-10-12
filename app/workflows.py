@@ -38,7 +38,7 @@ WORKFLOWS: dict[str, dict] = {
         ],
     },
     "comment_on_post": {
-        "title": "Comment on a post",
+        "title": "Comment on a post", "fetch": "post",
         "about": "Learns the hook of the target post, drafts a comment in your voice, humanizes it and queues it.",
         "needs": "url",
         "steps": [
@@ -51,9 +51,10 @@ WORKFLOWS: dict[str, dict] = {
         ],
     },
     "reply_sweep": {
-        "title": "Reply to comments",
+        "title": "Reply to comments", "fetch": "comments",
         "about": "Reads the comments on your post and drafts a reply for each one worth answering.",
-        "needs": "url",
+        "needs": "text",
+        "input_hint": "Post URL (auto-fetch with Apify) or paste the post and its comments",
         "steps": [
             {"id": "replies", "skill": "linkedin-reply-handler",
              "prompt": "Profile:\n{profile}\n\nPost and its comments:\n{input}\n\nDraft a reply for every comment worth answering."},
@@ -74,7 +75,7 @@ WORKFLOWS: dict[str, dict] = {
         ],
     },
     "hook_lab": {
-        "title": "Hook lab",
+        "title": "Hook lab", "fetch": "post",
         "about": "Reverse-engineers a viral post, then writes your own post on your topic with the same structure.",
         "needs": "url",
         "steps": [
@@ -87,19 +88,20 @@ WORKFLOWS: dict[str, dict] = {
         ],
     },
     "audience_report": {
-        "title": "Audience report",
+        "title": "Audience report", "fetch": "engagers",
         "about": "Segments the people who engaged with a post by ICP fit and lists the outbound actions.",
-        "needs": "url",
+        "needs": "text",
+        "input_hint": "Post URL (auto-fetch with Apify) or paste the engager list",
         "steps": [
             {"id": "report", "skill": "linkedin-engager-analytics",
              "prompt": "Profile:\n{profile}\n\nEngager data:\n{input}\n\nSegment by ICP fit, give the tier breakdown and the action lists."},
         ],
     },
     "thread_followup": {
-        "title": "Thread follow-up",
+        "title": "Thread follow-up", "fetch": "my_comments",
         "about": "Finds which of your comments earned author replies and drafts the follow-ups inside the warm window.",
         "needs": "text",
-        "input_hint": "Paste your recent comments and any author replies",
+        "input_hint": "Your profile URL (auto-fetch with Apify) or paste your recent comments and replies",
         "steps": [
             {"id": "threads", "skill": "linkedin-thread-monitor",
              "prompt": "Profile:\n{profile}\n\nActivity:\n{input}\n\nClassify each thread hot/warm/cool/dormant."},

@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS jobs(
 CREATE TABLE IF NOT EXISTS drafts(
   id INTEGER PRIMARY KEY, job_id INTEGER, profile_id INTEGER, kind TEXT NOT NULL,
   text TEXT NOT NULL, target_url TEXT, status TEXT NOT NULL DEFAULT 'pending',
-  result TEXT, created REAL, updated REAL);
+  result TEXT, media_url TEXT, created REAL, updated REAL);
 CREATE TABLE IF NOT EXISTS schedules(
   id INTEGER PRIMARY KEY, workflow TEXT NOT NULL, profile_id INTEGER, input TEXT,
   every_minutes INTEGER NOT NULL, next_run REAL NOT NULL, enabled INTEGER NOT NULL DEFAULT 1);
@@ -48,6 +48,9 @@ class Store:
         self.db.row_factory = sqlite3.Row
         with self.lock:
             self.db.executescript(SCHEMA)
+            cols = {r[1] for r in self.db.execute("PRAGMA table_info(drafts)")}
+            if "media_url" not in cols:                       # older database
+                self.db.execute("ALTER TABLE drafts ADD COLUMN media_url TEXT")
             # Crash recovery: anything that was mid-run goes back on the queue;
             # finished steps are kept, so it resumes instead of starting over.
             self.db.execute("UPDATE jobs SET status='queued' WHERE status='running'")

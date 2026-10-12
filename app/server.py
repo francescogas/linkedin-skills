@@ -121,9 +121,13 @@ def make_handler(store: Store, orch: Orchestrator, token: str | None):
                 if m := re.fullmatch(r"/api/drafts/(\d+)/(approve|reject)", path):
                     did = int(m[1])
                     if m[2] == "approve":
-                        return 200, publishing.approve(store, did, b.get("text"))
+                        return 200, publishing.approve(store, did, b.get("text"), b.get("scheduled_time") or None)
                     publishing.reject(store, did)
                     return 200, {"ok": True}
+                if m := re.fullmatch(r"/api/drafts/(\d+)/image", path):
+                    if not str(b.get("prompt", "")).strip():
+                        raise ValueError("prompt is required")
+                    return 200, publishing.illustrate(store, int(m[1]), b["prompt"], b.get("kind", "post"))
                 if m := re.fullmatch(r"/api/jobs/(\d+)/retry", path):
                     if not store.get("jobs", int(m[1])):
                         raise KeyError("job not found")

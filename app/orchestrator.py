@@ -13,7 +13,7 @@ import threading
 import time
 from typing import Optional
 
-from . import llm, skills
+from . import llm, skills, sources
 from .store import Store
 from .workflows import WORKFLOWS
 
@@ -33,25 +33,18 @@ def profile_block(p: Optional[dict]) -> str:
     return text
 
 
-def resolve_input(workflow: dict, raw: str) -> str:
-    """Fetch a LinkedIn post through the Apify layer when a URL was given.
+def resolve_input(workflow: dict, raw: str, profile: Optional[dict] = None) -> str:
+    """Auto-fetch the LinkedIn data the workflow reads (see sources.py).
 
-    Fetched text is wrapped as untrusted data (references/untrusted-content.md).
-    No token or no network: the URL goes through as is and the agent works from
-    what the user pasted around it.
+    No token or any failure: the raw input goes through and the agent works from
+    what the user pasted.
     """
     raw = (raw or "").strip()
-    if workflow["needs"] != "url" or not URL_RE.search(raw):
+    mode = workflow.get("fetch")
+    if not mode:
         return raw
-    try:
-        import lib
-        post = lib.fetch_post(URL_RE.search(raw).group(0))
-    except Exception:
-        post = None
-    if not post:
-        return raw
-    body = post.get("text") or post.get("content") or str(post)
-    return f"{raw}\n<untrusted_content source=\"apify\">\n{body}\n</untrusted_content>"
+    fetched = sources.fetch(mode, raw, (profile or {}).get("url"))
+    return f"{raw}\n{fetched}" if fetched else raw
 
 
 def render(template: str, ctx: dict) -> str:
@@ -95,7 +88,7 @@ class Orchestrator:
         wf = WORKFLOWS[job["workflow"]]
         profile = self.store.get("profiles", job["profile_id"]) if job["profile_id"] else None
         done = list(job["steps"] or [])
-        ctx = {"profile": profile_block(profile), "input": resolve_input(wf, job["input"]),
+        ctx = {"profile": profile_block(profile), "input": resolve_input(wf, job["input"], profile),
                "outs": {s["id"]: s["output"] for s in done}, "prev": done[-1]["output"] if done else ""}
         for step in wf["steps"][len(done):]:
             prompt = render(step["prompt"], ctx)

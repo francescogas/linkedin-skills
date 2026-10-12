@@ -41,12 +41,12 @@ def _anthropic(system: str, user: str, max_tokens: int) -> str:
     key = os.getenv("ANTHROPIC_API_KEY")
     if not key:
         raise LLMError("ANTHROPIC_API_KEY not set")
-    base = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com").rstrip("/")
+    base = (os.getenv("ANTHROPIC_BASE_URL") or "https://api.anthropic.com").rstrip("/")
     r = requests.post(
         f"{base}/v1/messages",
         headers={"x-api-key": key, "anthropic-version": "2023-06-01"},
         json={
-            "model": os.getenv("ANTHROPIC_MODEL", DEFAULT_ANTHROPIC_MODEL),
+            "model": (os.getenv("ANTHROPIC_MODEL") or DEFAULT_ANTHROPIC_MODEL),
             "max_tokens": max_tokens,
             "system": system,
             "messages": [{"role": "user", "content": user}],
@@ -59,13 +59,13 @@ def _anthropic(system: str, user: str, max_tokens: int) -> str:
 
 
 def _local(system: str, user: str, max_tokens: int) -> str:
-    base = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1").rstrip("/")
+    base = (os.getenv("LLM_BASE_URL") or "http://localhost:11434/v1").rstrip("/")
     headers = {"Authorization": f"Bearer {os.environ['LLM_API_KEY']}"} if os.getenv("LLM_API_KEY") else {}
     r = requests.post(
         f"{base}/chat/completions",
         headers=headers,
         json={
-            "model": os.getenv("LLM_MODEL", "llama3.1"),
+            "model": (os.getenv("LLM_MODEL") or "llama3.1"),
             "max_tokens": max_tokens,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         },
@@ -107,6 +107,6 @@ def complete(system: str, user: str, *, max_tokens: int = 4096) -> tuple[str, st
 def describe() -> dict:
     return {
         "chain": chain(),
-        "anthropic_model": os.getenv("ANTHROPIC_MODEL", DEFAULT_ANTHROPIC_MODEL),
-        "local_model": os.getenv("LLM_MODEL", "llama3.1") if os.getenv("LLM_BASE_URL") else None,
+        "anthropic_model": (os.getenv("ANTHROPIC_MODEL") or DEFAULT_ANTHROPIC_MODEL),
+        "local_model": (os.getenv("LLM_MODEL") or "llama3.1") if os.getenv("LLM_BASE_URL") else None,
     }
