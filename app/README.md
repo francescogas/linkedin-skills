@@ -58,6 +58,18 @@ Reading LinkedIn posts uses Apify when `APIFY_TOKEN` is set, otherwise paste the
 - To serve beyond localhost set `APP_HOST` and `APP_TOKEN`; a non-loopback bind without a token is refused. Put TLS in front of it.
 - Run `python3 -m app worker` under systemd or `launchd`, or use the bundled `Dockerfile` and `docker-compose.yml` (`APP_TOKEN=... docker compose up -d`; state lives in the `studio-data` volume; keep TLS in a reverse proxy in front).
 
+## Deploy on a VPS (Debian/Ubuntu, e.g. Aruba Cloud)
+
+```bash
+ssh root@<vps-ip>
+curl -fsSL https://raw.githubusercontent.com/francescogas/linkedin-skills/claude/dazzling-planck-18p21t/deploy/install.sh -o install.sh
+sudo DOMAIN=studio.example.com bash install.sh     # omit DOMAIN to stay on localhost + SSH tunnel
+nano /etc/linkedin-studio.env                       # add ANTHROPIC_API_KEY (or LLM_BASE_URL), then:
+systemctl restart linkedin-studio
+```
+
+The script installs Python and git, creates an unprivileged `studio` user, a virtualenv, a hardened systemd service that restarts on failure, a private `/etc/linkedin-studio.env` with a generated `APP_TOKEN`, and (with `DOMAIN`) Caddy for HTTPS. Re-run it to update. If the repository is private, clone it first with a deploy key or token and set `REPO_URL`.
+
 ## Safety
 
 Fetched LinkedIn content is wrapped as `<untrusted_content>` and agents are told to treat it as data (`references/untrusted-content.md`). Agents have no tools; the approval endpoint is the single publish path, and a draft can be approved once.
