@@ -17,3 +17,6 @@ testing/
 # Playwright MCP session artifacts
 .playwright-mcp/
 /fk-*
+
+# Studio app runtime data (queue, drafts, profiles)
+app/data/

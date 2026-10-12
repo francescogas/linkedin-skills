@@ -125,6 +125,10 @@ npx skills add sergebulaev/linkedin-skills
 
 > **Found this useful? [Star the repo](https://github.com/sergebulaev/linkedin-skills).** Curated Claude Code and Codex directories rank and gate by star count, so a star is what makes these skills findable for the next person. It is the only thing we ask. No signup, no email.
 
+## Studio app
+
+`python3 -m app` starts a local web app that runs all 12 skills as chained agents with a job queue, schedules and an approval queue, on cloud, private-cloud or local models. See [app/README.md](app/README.md).
+
 ## What you can do
 
 Once installed, just ask Claude Code or Codex for help with LinkedIn. The right skill activates automatically.
