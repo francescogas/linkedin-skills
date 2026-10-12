@@ -7,13 +7,15 @@
 #   - Python runs in its own virtualenv; no system pip, no system packages upgraded
 #   - apt installs only what is missing (git, python3-venv, curl, openssl), no `apt-get update`
 #     unless something has to be installed, and never an upgrade
-#   - the port is chosen free (default 8765, next free if taken) and bound to 127.0.0.1 only
+#   - the port is verified free (listening sockets, Docker mappings, web-server configs) and bound
+#     to 127.0.0.1 only; an explicit PORT that is taken stops the install, it is never shifted
 #   - no web server is installed or reconfigured: nginx/Caddy/Apache snippets are printed for you
 #
 # Preview without changing anything:   DRY_RUN=1 sudo -E bash install.sh
 # Install / update:                    sudo bash install.sh
 # Remove:                              sudo bash install.sh --uninstall   (keeps data and env file)
 #
+# Choose the port yourself:            PORT=18080 sudo -E bash install.sh
 # Overrides: REPO_URL, BRANCH (default claude/dazzling-planck-18p21t; use main once merged),
 #            APP_DIR, PORT
 set -euo pipefail
@@ -42,10 +44,30 @@ if [ "${1:-}" = "--uninstall" ]; then
   exit 0
 fi
 
-port_busy() { ss -ltn 2>/dev/null | awk '{print $4}' | grep -qE "[:.]$1\$"; }
+# A port counts as taken if something listens on it now, Docker publishes it, or a web-server /
+# systemd config on this machine mentions it (covers services that are stopped at the moment).
+# Listening TCP ports: `ss` if present, else the kernel table (state 0A = LISTEN); no extra package.
+listening_ports() {
+  if command -v ss >/dev/null; then
+    ss -ltnH 2>/dev/null | awk '{print $4}' | sed 's/.*[:.]//'
+  else
+    cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk '$4=="0A"{split($2,a,":"); print a[2]}' |
+      while read -r hex; do echo $((16#$hex)); done
+  fi
+}
+used_ports() {
+  { listening_ports
+    command -v docker >/dev/null && docker ps --format '{{.Ports}}' 2>/dev/null | grep -oE ':[0-9]+->' | tr -dc '0-9\n:' | tr ':' '\n'
+    grep -rhoE '(listen|proxy_pass|reverse_proxy|ProxyPass|Listen|APP_PORT|PORT)[^#\n]{0,40}' \
+      /etc/nginx /etc/caddy /etc/apache2 /etc/systemd/system /etc/*.env 2>/dev/null | grep -oE '[0-9]{4,5}'
+  } | sort -un
+}
+USED="$(used_ports)"
+port_busy() { echo "$USED" | grep -qx "$1"; }
 
 say "Preflight (read only)"
 echo "    OS: $(. /etc/os-release && echo "$PRETTY_NAME")   RAM free: $(free -m | awk '/Mem:/{print $7}') MB   disk free on /opt: $(df -h /opt | awk 'NR==2{print $4}')"
+echo "    ports in use or referenced here: $(echo "$USED" | tr '\n' ' ')"
 if [ -e "$APP_DIR" ] && [ ! -d "$APP_DIR/.git" ]; then
   echo "    $APP_DIR exists and is not a previous install of this app. Set APP_DIR to another path."; exit 1
 fi
@@ -54,10 +76,17 @@ if [ -f "$UNIT" ] && ! grep -q "LinkedIn Skills Studio" "$UNIT"; then
 fi
 PORT="${PORT:-}"
 if [ -z "$PORT" ] && [ -f "$ENV_FILE" ]; then PORT="$(grep -E '^APP_PORT=' "$ENV_FILE" | cut -d= -f2 || true)"; fi
-if [ -z "$PORT" ]; then
+if [ -n "$PORT" ]; then
+  case "$PORT" in *[!0-9]*) echo "    PORT must be a number."; exit 1;; esac
+  # Our own running service legitimately holds its port on a re-run.
+  if port_busy "$PORT" && ! { systemctl is-active --quiet linkedin-studio && grep -q "^APP_PORT=$PORT\$" "$ENV_FILE" 2>/dev/null; }; then
+    echo "    port $PORT is taken. Pick another with PORT=<free port>. Nothing was changed."; exit 1
+  fi
+  echo "    port: $PORT (your choice, verified free)"
+else
   PORT=8765; while port_busy "$PORT"; do PORT=$((PORT + 1)); done
+  echo "    port: $PORT (first free from 8765; to choose your own, rerun with PORT=<n>)"
 fi
-echo "    port: $PORT (127.0.0.1 only)"
 MISSING=()
 for pair in git:git curl:curl openssl:openssl python3:python3; do
   command -v "${pair%%:*}" >/dev/null || MISSING+=("${pair##*:}")

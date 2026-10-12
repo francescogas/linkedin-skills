@@ -60,13 +60,13 @@ Reading LinkedIn posts uses Apify when `APIFY_TOKEN` is set, otherwise paste the
 
 ## Deploy on a shared VPS (Debian/Ubuntu, e.g. Aruba Cloud)
 
-Built for a server that already runs other software: it uses its own directory, user, virtualenv and systemd unit, picks a free port on 127.0.0.1, installs only missing apt packages (no upgrades) and never touches nginx, Caddy or Apache.
+Built for a server that already runs other software: it uses its own directory, user, virtualenv and systemd unit, uses a port you choose (`PORT=18080`) after checking it is free (listening sockets, Docker mappings, web-server configs), on 127.0.0.1, installs only missing apt packages (no upgrades) and never touches nginx, Caddy or Apache.
 
 ```bash
 ssh root@<vps-ip>
 curl -fsSL https://raw.githubusercontent.com/francescogas/linkedin-skills/claude/dazzling-planck-18p21t/deploy/install.sh -o install.sh
 DRY_RUN=1 bash install.sh      # preview: changes nothing
-bash install.sh                # install or update
+PORT=18080 bash install.sh      # install or update on a port you picked (stops if it is taken)
 nano /etc/linkedin-studio.env  # add ANTHROPIC_API_KEY (or LLM_BASE_URL), then: systemctl restart linkedin-studio
 bash install.sh --uninstall    # remove service and code, keeps data and env file
 ```
