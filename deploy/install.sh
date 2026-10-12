@@ -11,7 +11,7 @@
 #     to 127.0.0.1 only; an explicit PORT that is taken stops the install, it is never shifted
 #   - no web server is installed or reconfigured: nginx/Caddy/Apache snippets are printed for you
 #
-# Preview without changing anything:   DRY_RUN=1 sudo -E bash install.sh
+# Preview without changing anything:   DRY_RUN=1 bash install.sh   (no root needed)
 # Install / update:                    sudo bash install.sh
 # Remove:                              sudo bash install.sh --uninstall   (keeps data and env file)
 #
@@ -32,11 +32,12 @@ DRY="${DRY_RUN:-0}"
 say() { echo "==> $*"; }
 run() { if [ "$DRY" = 1 ]; then echo "    [dry-run] $*"; else "$@"; fi; }
 
-[ "$(id -u)" -eq 0 ] || { echo "Run as root (sudo bash install.sh)"; exit 1; }
+[ "$DRY" = 1 ] || [ "$(id -u)" -eq 0 ] || { echo "Run as root: sudo bash install.sh   (the preview needs no root: DRY_RUN=1 bash install.sh)"; exit 1; }
 command -v apt-get >/dev/null || { echo "Debian/Ubuntu only (apt-get not found)."; exit 1; }
 command -v systemctl >/dev/null || { echo "systemd not found."; exit 1; }
 
 if [ "${1:-}" = "--uninstall" ]; then
+  [ "$(id -u)" -eq 0 ] || { echo "Run as root."; exit 1; }
   systemctl disable --now linkedin-studio 2>/dev/null || true
   rm -f "$UNIT"; systemctl daemon-reload
   rm -rf "$APP_DIR"
