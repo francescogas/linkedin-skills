@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LinkedIn Skills Studio</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#16202b;--mute:#5d6b7a;--line:#dde2e8;--acc:#0a66c2;--ok:#157347;--bad:#b42318}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1419;--card:#18202a;--ink:#e6ebf0;--mute:#93a1b0;--line:#2a3542;--acc:#5aa9f0;--ok:#4cc38a;--bad:#f1766b}}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line);background:var(--card)}
+h1{font-size:18px;margin:0}nav{display:flex;flex-wrap:wrap;gap:4px;padding:8px 16px}
+nav button{background:none;border:1px solid transparent;color:var(--mute);padding:6px 12px;border-radius:8px;cursor:pointer;font:inherit}
+nav button.on{border-color:var(--line);background:var(--card);color:var(--ink);font-weight:600}
+main{max-width:980px;margin:0 auto;padding:8px 16px 48px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:10px 0}
+.card h3{margin:0 0 4px;font-size:15px}.mute{color:var(--mute);font-size:13px}
+label{display:block;font-size:13px;color:var(--mute);margin:8px 0 2px}
+input,textarea,select{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+textarea{min-height:90px;resize:vertical}
+button.p{background:var(--acc);color:#fff;border:0;padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit;margin-top:10px}
+button.s{background:none;border:1px solid var(--line);color:var(--ink);padding:6px 12px;border-radius:8px;cursor:pointer;font:inherit}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row>*{flex:0 0 auto}
+.tag{font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--mute)}
+.ok{color:var(--ok);border-color:var(--ok)}.bad{color:var(--bad);border-color:var(--bad)}
+pre{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;margin:6px 0;font:13px/1.5 ui-monospace,monospace}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+</style>
+</head>
+<body>
+<header><h1>LinkedIn Skills Studio</h1><div id="status" class="row mute"></div></header>
+<nav id="tabs"></nav>
+<main id="view"></main>
+<script>
+const $=(s,r=document)=>r.querySelector(s);
+function h(tag,attrs={},...kids){const e=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==="class")e.className=v;else if(k.startsWith("on"))e.addEventListener(k.slice(2),v);else e.setAttribute(k,v)}for(const c of kids.flat())e.append(c instanceof Node?c:document.createTextNode(c??""));return e}
+const tok=()=>localStorage.getItem("tok")||"";
+async function api(path,method="GET",body){
+  const r=await fetch(path,{method,headers:{"Content-Type":"application/json",...(tok()?{Authorization:"Bearer "+tok()}:{})},body:body?JSON.stringify(body):undefined});
+  const j=await r.json();if(r.status===401){const t=prompt("Token di accesso (APP_TOKEN)");if(t){localStorage.setItem("tok",t);return api(path,method,body)}}
+  if(!r.ok)throw new Error(j.error||r.status);return j}
+const tabs={profili:profili,workflow:workflow,approvazioni:approvazioni,job:jobs,pianificazioni:pianificazioni,skill:skillsTab};
+let cur=localStorage.getItem("tab")||"profili",timer;
+function nav(){const n=$("#tabs");n.replaceChildren(...Object.keys(tabs).map(k=>h("button",{class:k===cur?"on":"",onclick:()=>{cur=k;localStorage.setItem("tab",k);nav();render()}},k[0].toUpperCase()+k.slice(1))))}
+async function render(){clearInterval(timer);const v=$("#view");try{v.replaceChildren(await tabs[cur]())}catch(e){v.replaceChildren(h("div",{class:"card bad"},String(e.message||e)))}
+  if(["job","approvazioni"].includes(cur))timer=setInterval(async()=>{try{$("#view").replaceChildren(await tabs[cur]())}catch{}},5000)}
+async function status(){const s=await api("/api/status");$("#status").replaceChildren(
+  h("span",{class:"tag"},"LLM: "+s.llm.chain.join(" → ")),h("span",{class:"tag "+(s.publish_backend==="manual"?"":"ok")},"Pubblicazione: "+s.publish_backend),
+  h("span",{class:"tag"},"Lettura: "+s.read_layer))}
+const field=(l,id,ta)=>[h("label",{for:id},l),ta?h("textarea",{id}):h("input",{id})];
+
+async function profili(){
+  const list=await api("/api/profiles");
+  const f=h("div",{class:"card"},h("h3",{},"Nuovo profilo"),
+    ...field("Nome *","p-name"),...field("URL LinkedIn","p-url"),...field("Ruolo","p-role"),...field("Obiettivo (es. lead, assunzioni, autorevolezza)","p-goal"),
+    ...field("Pubblico target","p-aud"),...field("Note sul tono di voce","p-voice",1),...field("Contenuto attuale del profilo (headline, About, esperienze: incolla il testo)","p-text",1),
+    h("button",{class:"p",onclick:async()=>{await api("/api/profiles","POST",{name:$("#p-name").value,url:$("#p-url").value,role:$("#p-role").value,goal:$("#p-goal").value,audience:$("#p-aud").value,voice:$("#p-voice").value,profile_text:$("#p-text").value});render()}},"Salva profilo"));
+  return h("div",{},f,...list.map(p=>h("div",{class:"card"},h("div",{class:"row"},h("h3",{},p.name),h("span",{class:"mute"},"#"+p.id+" "+(p.role||"")),
+    h("button",{class:"s",onclick:async()=>{if(confirm("Eliminare il profilo?")){await api("/api/profiles/"+p.id,"DELETE");render()}}},"Elimina")),h("div",{class:"mute"},p.goal||""))))}
+
+async function profileSelect(id){const ps=await api("/api/profiles");return h("select",{id},h("option",{value:""},"(nessun profilo)"),...ps.map(p=>h("option",{value:p.id},p.name)))}
+
+async function workflow(){
+  const wfs=await api("/api/workflows"),ps=await profileSelect("w-prof");
+  return h("div",{},h("div",{class:"card"},h("label",{},"Profilo"),ps),h("div",{class:"grid"},...wfs.map(w=>{
+    const inp=w.needs==="none"?null:h(w.needs==="url"?"input":"textarea",{placeholder:w.needs==="url"?"URL del post LinkedIn":w.input_hint});
+    return h("div",{class:"card"},h("h3",{},w.title),h("div",{class:"mute"},w.about),h("div",{class:"row",style:"margin-top:6px"},...w.skills.filter((s,i,a)=>a.indexOf(s)===i).map(s=>h("span",{class:"tag"},s.replace("linkedin-","")))),inp||"",
+      h("button",{class:"p",onclick:async()=>{await api("/api/jobs","POST",{workflow:w.id,profile_id:ps.value,input:inp?inp.value:""});cur="job";nav();render()}},"Avvia"))})))}
+
+async function approvazioni(){
+  const ds=(await api("/api/drafts")).filter(d=>d.status==="pending");
+  if(!ds.length)return h("div",{class:"card mute"},"Nessuna bozza in attesa. Niente viene pubblicato senza la tua approvazione.");
+  return h("div",{},...ds.map(d=>{const ta=h("textarea",{style:"min-height:160px"});ta.value=d.text;
+    return h("div",{class:"card"},h("div",{class:"row"},h("h3",{},d.kind+" #"+d.id),h("span",{class:"mute"},(d.target_url||"nuovo post")+" · "+ta.value.length+" car.")),ta,
+      h("div",{class:"row"},h("button",{class:"p",onclick:async()=>{if(!confirm("Pubblicare ora?"))return;const r=await api(`/api/drafts/${d.id}/approve`,"POST",{text:ta.value});alert(r.backend==="manual"?r.result.message:"Pubblicato via "+r.backend);render()}},"Approva e pubblica"),
+      h("button",{class:"s",onclick:async()=>{await api(`/api/drafts/${d.id}/reject`,"POST");render()}},"Scarta")))}))}
+
+async function jobs(){
+  const js=await api("/api/jobs");
+  return h("div",{},...js.map(j=>h("div",{class:"card"},h("div",{class:"row"},h("h3",{},"#"+j.id+" "+j.workflow),
+    h("span",{class:"tag "+(j.status==="done"?"ok":j.status==="failed"?"bad":"")},j.status),
+    j.status==="failed"?h("button",{class:"s",onclick:async()=>{await api(`/api/jobs/${j.id}/retry`,"POST");render()}},"Riprova"):""),
+    j.error?h("div",{class:"bad mute"},j.error):"",
+    ...(j.steps||[]).map(s=>h("details",{},h("summary",{},s.id+" · "+s.skill.replace("linkedin-","")+" · "+s.backend),h("pre",{},s.output))))))}
+
+async function pianificazioni(){
+  const [ss,wfs]=await Promise.all([api("/api/schedules"),api("/api/workflows")]),ps=await profileSelect("s-prof");
+  const wsel=h("select",{id:"s-wf"},...wfs.map(w=>h("option",{value:w.id},w.title)));
+  return h("div",{},h("div",{class:"card"},h("h3",{},"Nuova pianificazione (gira h24 finché il servizio è attivo)"),h("label",{},"Workflow"),wsel,h("label",{},"Profilo"),ps,
+    h("label",{},"Input (tema, URL, testo)"),h("input",{id:"s-in"}),h("label",{},"Ogni quanti minuti (1440 = ogni giorno, 10080 = ogni settimana)"),h("input",{id:"s-min",type:"number",value:"1440"}),
+    h("button",{class:"p",onclick:async()=>{await api("/api/schedules","POST",{workflow:wsel.value,profile_id:ps.value,input:$("#s-in").value,every_minutes:$("#s-min").value});render()}},"Pianifica")),
+    ...ss.map(s=>h("div",{class:"card row"},h("b",{},s.workflow),h("span",{class:"mute"},`ogni ${s.every_minutes} min · prossima: ${new Date(s.next_run*1000).toLocaleString()}`),
+      h("button",{class:"s",onclick:async()=>{await api("/api/schedules/"+s.id,"DELETE");render()}},"Elimina"))))}
+
+async function skillsTab(){const ss=await api("/api/skills");return h("div",{class:"grid"},...ss.map(s=>h("div",{class:"card"},h("h3",{},s.name),h("div",{class:"mute"},s.description))))}
+
+nav();render();status().catch(()=>{});
+</script>
+</body>
+</html>
