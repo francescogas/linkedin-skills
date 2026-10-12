@@ -57,13 +57,15 @@ listening_ports() {
   fi
 }
 used_ports() {
-  { listening_ports
-    command -v docker >/dev/null && docker ps --format '{{.Ports}}' 2>/dev/null | grep -oE ':[0-9]+->' | tr -dc '0-9\n:' | tr ':' '\n'
-    grep -rhoE '(listen|proxy_pass|reverse_proxy|ProxyPass|Listen|APP_PORT|PORT)[^#\n]{0,40}' \
-      /etc/nginx /etc/caddy /etc/apache2 /etc/systemd/system /etc/*.env 2>/dev/null | grep -oE '[0-9]{4,5}'
-  } | sort -un
+  listening_ports || true
+  if command -v docker >/dev/null; then
+    docker ps --format '{{.Ports}}' 2>/dev/null | grep -oE ':[0-9]+->' | tr -dc '0-9\n' || true
+    echo
+  fi
+  grep -rhoE '(listen|proxy_pass|reverse_proxy|ProxyPass|Listen|APP_PORT|PORT)[^#]{0,40}' \
+    /etc/nginx /etc/caddy /etc/apache2 /etc/systemd/system /etc/*.env 2>/dev/null | grep -oE '[0-9]{4,5}' || true
 }
-USED="$(used_ports)"
+USED="$(used_ports | sed '/^$/d' | sort -un)"
 port_busy() { echo "$USED" | grep -qx "$1"; }
 
 say "Preflight (read only)"
