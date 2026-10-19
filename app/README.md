@@ -48,6 +48,22 @@ Set `LLM_CHAIN` (comma list, tried in order) or let it follow what is configured
 
 Reading LinkedIn posts uses Apify when `APIFY_TOKEN` is set, otherwise paste the text. Publishing uses Publora when configured, otherwise the approval card returns a copy-paste block (see the root `.env.example`).
 
+## Working from the terminal only (`lstudio`)
+
+The installer adds `/usr/local/bin/lstudio` (it uses sudo to read the private env file). Everything the web UI does is available:
+
+```bash
+lstudio status                          # models, publish backend, read layer
+lstudio workflows                       # the 9 workflows
+lstudio profile-add "Ada" --role CEO --goal "inbound leads" --text-file profile.txt
+lstudio run profile_makeover --profile 1
+lstudio run repurpose "text or URL to adapt"   # waits and prints each agent's output
+lstudio drafts                          # approval queue
+lstudio approve 3                       # asks for 'yes'; --edit-file f.txt to publish other text, --at ISO for a time
+lstudio reject 3
+lstudio schedule-add weekly_autopilot 10080 "this week's theme" --profile 1
+```
+
 ## Data, images and scheduling
 
 - With `APIFY_TOKEN`, the post, comment, engager and recent-comment workflows fetch their input from a LinkedIn URL (`sources.py`); without it, paste the text. Fetched data is fenced as untrusted and capped at 12k characters.

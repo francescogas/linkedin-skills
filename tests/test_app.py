@@ -216,5 +216,53 @@ class Api(unittest.TestCase):
         self.assertEqual(self.call("/api/jobs", "POST", {"workflow": "nope"})[0], 404)
 
 
+class Terminal(unittest.TestCase):
+    """`lstudio` end to end against a real in-process server."""
+
+    def setUp(self):
+        import io
+        from app import ctl
+        self.ctl_mod, self.io = ctl, io
+        self.store = Store(":memory:")
+        self.orch = Orchestrator(self.store, workers=1)
+        self.orch.start()
+        self.srv = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self.store, self.orch, "secret"))
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+        self.base = f"http://127.0.0.1:{self.srv.server_port}"
+
+    def tearDown(self):
+        self.orch.shutdown()
+        self.srv.shutdown()
+        self.srv.server_close()
+
+    def run_cmd(self, *argv, confirm=lambda _: "yes"):
+        out = self.io.StringIO()
+        code = self.ctl_mod.main(list(argv), self.ctl_mod.Ctl(self.base, "secret", out=out), confirm=confirm)
+        return code, out.getvalue()
+
+    def test_run_waits_and_leaves_a_draft_that_needs_confirmation(self):
+        code, out = self.run_cmd("run", "repurpose", "hello world", "--timeout", "30")
+        self.assertEqual(code, 0)
+        self.assertIn("status=done", out)
+        _, drafts = self.run_cmd("drafts")
+        self.assertIn("draft #1 [post] pending", drafts)
+        code, out = self.run_cmd("approve", "1", confirm=lambda _: "no")      # nothing published
+        self.assertEqual((code, "not published" in out), (1, True))
+        self.assertIn("pending", self.run_cmd("drafts")[1])
+        code, out = self.run_cmd("approve", "1", "--yes")
+        self.assertEqual(code, 0)
+        self.assertIn("published via manual", out)
+        self.assertIn("no pending drafts", self.run_cmd("drafts")[1])
+
+    def test_profiles_schedules_and_wrong_token(self):
+        self.assertIn("profile id: 1", self.run_cmd("profile-add", "Ada", "--role", "CEO")[1])
+        self.assertIn("Ada", self.run_cmd("profiles")[1])
+        self.assertIn("schedule id: 1", self.run_cmd("schedule-add", "weekly_autopilot", "10080", "AI")[1])
+        self.assertIn("weekly_autopilot every 10080", self.run_cmd("schedules")[1])
+        bad = self.ctl_mod.Ctl(self.base, "wrong", out=self.io.StringIO())
+        with self.assertRaises(SystemExit):
+            self.ctl_mod.main(["status"], bad)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,4 @@
-"""python -m app [serve|worker|run <workflow> [input]]"""
+"""python -m app [serve|worker|run <workflow> [input]|ctl ...]"""
 import argparse
 import sys
 import time
@@ -19,6 +19,10 @@ def main() -> None:
     r = sub.add_parser("run", help="run one workflow now and print each agent's output")
     r.add_argument("workflow", choices=sorted(WORKFLOWS)); r.add_argument("input", nargs="?", default="")
     r.add_argument("--profile", type=int)
+    if len(sys.argv) > 1 and sys.argv[1] == "ctl":      # terminal control of the running service
+        from . import ctl
+        sys.argv = sys.argv[1:]
+        return ctl.cli()
     a = ap.parse_args()
     if a.cmd in (None, "serve"):
         server.serve(getattr(a, "host", None), getattr(a, "port", None), getattr(a, "workers", 2))

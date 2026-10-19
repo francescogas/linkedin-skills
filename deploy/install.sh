@@ -187,12 +187,29 @@ UNITFILE
   systemctl is-active --quiet linkedin-studio || { journalctl -u linkedin-studio -n 30 --no-pager; exit 1; }
 fi
 
+WRAP=/usr/local/bin/lstudio
+if [ "$DRY" = 1 ]; then
+  echo "    [dry-run] would install the terminal command $WRAP"
+elif [ -e "$WRAP" ] && ! grep -q "LinkedIn Skills Studio" "$WRAP"; then
+  echo "    $WRAP exists and is not ours: terminal command NOT installed"
+else
+  cat > "$WRAP" <<'WRAPPER'
+#!/usr/bin/env bash
+# LinkedIn Skills Studio terminal control. Needs sudo only to read the private env file.
+set -a; . <(sudo cat /etc/linkedin-studio.env); set +a  # LinkedIn Skills Studio
+exec /opt/linkedin-studio/.venv/bin/python -m app ctl "$@"
+WRAPPER
+  chmod 755 "$WRAP"
+fi
+
 echo
 if [ "$DRY" = 1 ]; then echo "Dry run finished: nothing was changed."; exit 0; fi
 echo "Running on 127.0.0.1:$PORT. Access token: $(grep '^APP_TOKEN=' "$ENV_FILE" | cut -d= -f2)"
 cat <<TXT
 
-Reach it from your PC without exposing anything:
+Work from this terminal: lstudio status | lstudio workflows | lstudio run <workflow> "<input>" | lstudio drafts | lstudio approve <id>
+
+Or reach the web UI from your PC without exposing anything:
   ssh -L $PORT:127.0.0.1:$PORT <user>@<vps-ip>     then open http://127.0.0.1:$PORT
 
 To publish it on a domain, add ONE of these to the web server you already run (nothing was changed for you):
