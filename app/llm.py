@@ -7,6 +7,7 @@ labelled placeholder instead of pretending to write.
 
   anthropic  ANTHROPIC_API_KEY, ANTHROPIC_MODEL, ANTHROPIC_BASE_URL (gateway or
              private-cloud endpoint that speaks the Messages API)
+  all        LLM_MAX_TOKENS (default 4096; reasoning models need more, e.g. 16000)
   openai     OPENAI_API_KEY, OPENAI_MODEL (required, no default), OPENAI_BASE_URL (optional,
              for Azure or a proxy)
   local      LLM_BASE_URL (OpenAI-compatible: Ollama, LM Studio, vLLM, llama.cpp),
@@ -83,7 +84,13 @@ def _openai(system: str, user: str, max_tokens: int) -> str:
     )
     if r.status_code >= 400:
         raise LLMError(f"openai {r.status_code}: {r.text[:300]}")
-    return r.json()["choices"][0]["message"]["content"] or ""
+    choice = r.json()["choices"][0]
+    text = choice["message"].get("content") or ""
+    if not text.strip():
+        # Reasoning models spend the token budget before answering; say so instead of passing "" on.
+        raise LLMError(f"openai returned no text (finish_reason={choice.get('finish_reason')}); "
+                       "raise LLM_MAX_TOKENS")
+    return text
 
 
 def _local(system: str, user: str, max_tokens: int) -> str:
@@ -117,8 +124,9 @@ def _offline(system: str, user: str, max_tokens: int) -> str:
 BACKENDS = {"anthropic": _anthropic, "openai": _openai, "local": _local, "offline": _offline}
 
 
-def complete(system: str, user: str, *, max_tokens: int = 4096) -> tuple[str, str]:
+def complete(system: str, user: str, *, max_tokens: Optional[int] = None) -> tuple[str, str]:
     """Return (text, backend_used). Tries the chain in order."""
+    max_tokens = max_tokens or int(os.getenv("LLM_MAX_TOKENS") or 4096)
     errors = []
     for name in chain():
         fn = BACKENDS.get(name)

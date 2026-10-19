@@ -15,7 +15,7 @@ from http.server import ThreadingHTTPServer
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-for k in ("ANTHROPIC_API_KEY", "LLM_BASE_URL", "LLM_CHAIN", "OPENAI_API_KEY", "OPENAI_MODEL", "PUBLORA_API_KEY", "LINKEDIN_PLATFORM_ID", "APIFY_TOKEN", "APP_TOKEN"):
+for k in ("ANTHROPIC_API_KEY", "LLM_BASE_URL", "LLM_CHAIN", "OPENAI_API_KEY", "OPENAI_MODEL", "LLM_MAX_TOKENS", "PUBLORA_API_KEY", "LINKEDIN_PLATFORM_ID", "APIFY_TOKEN", "APP_TOKEN"):
     os.environ.pop(k, None)
 
 from app import llm, skills, workflows                     # noqa: E402
@@ -139,6 +139,20 @@ class Sources(unittest.TestCase):
         finally:
             os.environ.pop("OPENAI_API_KEY", None)
             os.environ.pop("OPENAI_MODEL", None)
+
+    def test_empty_openai_answer_is_an_error_not_an_empty_step(self):
+        from unittest import mock
+        os.environ.update(OPENAI_API_KEY="sk-test", OPENAI_MODEL="m", LLM_CHAIN="openai", LLM_MAX_TOKENS="123")
+        try:
+            resp = mock.Mock(status_code=200, json=lambda: {"choices": [{"message": {"content": None}, "finish_reason": "length"}]})
+            with mock.patch("app.llm.requests.post", return_value=resp) as post:
+                with self.assertRaises(llm.LLMError) as cm:
+                    llm.complete("s", "u")
+            self.assertIn("finish_reason=length", str(cm.exception))
+            self.assertEqual(post.call_args.kwargs["json"]["max_completion_tokens"], 123)
+        finally:
+            for k in ("OPENAI_API_KEY", "OPENAI_MODEL", "LLM_CHAIN", "LLM_MAX_TOKENS"):
+                os.environ.pop(k, None)
 
     def test_empty_env_values_fall_back_to_defaults(self):
         os.environ["ANTHROPIC_BASE_URL"] = ""
