@@ -197,7 +197,7 @@ else
 #!/usr/bin/env bash
 # LinkedIn Skills Studio terminal control. Needs sudo only to read the private env file.
 set -a; . <(sudo cat /etc/linkedin-studio.env); set +a  # LinkedIn Skills Studio
-exec /opt/linkedin-studio/.venv/bin/python -m app ctl "$@"
+PYTHONPATH=/opt/linkedin-studio exec /opt/linkedin-studio/.venv/bin/python -m app ctl "$@"
 WRAPPER
   chmod 755 "$WRAP"
 fi
