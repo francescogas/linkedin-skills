@@ -137,8 +137,10 @@ APP_PORT=$PORT
 APP_TOKEN=$(openssl rand -hex 24)
 LINKEDIN_APP_DATA=$DATA_DIR
 
-# Model: set ONE of these (or both with LLM_CHAIN=anthropic,local).
+# Model: set one or more; LLM_CHAIN sets the fallback order (e.g. openai,local).
 #ANTHROPIC_API_KEY=
+#OPENAI_API_KEY=
+#OPENAI_MODEL=
 #LLM_BASE_URL=http://127.0.0.1:11434/v1
 #LLM_MODEL=llama3.1
 #LLM_CHAIN=anthropic,local

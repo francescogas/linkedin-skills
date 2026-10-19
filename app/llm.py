@@ -1,12 +1,14 @@
 """Model backends: cloud, private cloud, local, and an offline placeholder.
 
-Chain order comes from `LLM_CHAIN` (comma list of `anthropic`, `local`), so a
+Chain order comes from `LLM_CHAIN` (comma list of `anthropic`, `openai`, `local`), so a
 laptop falls back from the cloud model to a local one when the network drops.
 With nothing configured the app uses `offline`, which returns a clearly
 labelled placeholder instead of pretending to write.
 
   anthropic  ANTHROPIC_API_KEY, ANTHROPIC_MODEL, ANTHROPIC_BASE_URL (gateway or
              private-cloud endpoint that speaks the Messages API)
+  openai     OPENAI_API_KEY, OPENAI_MODEL (required, no default), OPENAI_BASE_URL (optional,
+             for Azure or a proxy)
   local      LLM_BASE_URL (OpenAI-compatible: Ollama, LM Studio, vLLM, llama.cpp),
              LLM_MODEL, LLM_API_KEY (optional)
 """
@@ -32,6 +34,8 @@ def chain() -> list[str]:
     out = []
     if os.getenv("ANTHROPIC_API_KEY"):
         out.append("anthropic")
+    if os.getenv("OPENAI_API_KEY"):
+        out.append("openai")
     if os.getenv("LLM_BASE_URL"):
         out.append("local")
     return out or ["offline"]
@@ -56,6 +60,30 @@ def _anthropic(system: str, user: str, max_tokens: int) -> str:
     if r.status_code >= 400:
         raise LLMError(f"anthropic {r.status_code}: {r.text[:300]}")
     return "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
+
+
+def _openai(system: str, user: str, max_tokens: int) -> str:
+    key = os.getenv("OPENAI_API_KEY")
+    model = os.getenv("OPENAI_MODEL")
+    if not key:
+        raise LLMError("OPENAI_API_KEY not set")
+    if not model:
+        raise LLMError("OPENAI_MODEL not set: name the model to use")
+    base = (os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
+    r = requests.post(
+        f"{base}/chat/completions",
+        headers={"Authorization": f"Bearer {key}"},
+        json={
+            "model": model,
+            # Current OpenAI models reject the older `max_tokens`.
+            "max_completion_tokens": max_tokens,
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        },
+        timeout=TIMEOUT,
+    )
+    if r.status_code >= 400:
+        raise LLMError(f"openai {r.status_code}: {r.text[:300]}")
+    return r.json()["choices"][0]["message"]["content"] or ""
 
 
 def _local(system: str, user: str, max_tokens: int) -> str:
@@ -86,7 +114,7 @@ def _offline(system: str, user: str, max_tokens: int) -> str:
     )
 
 
-BACKENDS = {"anthropic": _anthropic, "local": _local, "offline": _offline}
+BACKENDS = {"anthropic": _anthropic, "openai": _openai, "local": _local, "offline": _offline}
 
 
 def complete(system: str, user: str, *, max_tokens: int = 4096) -> tuple[str, str]:
@@ -108,5 +136,6 @@ def describe() -> dict:
     return {
         "chain": chain(),
         "anthropic_model": (os.getenv("ANTHROPIC_MODEL") or DEFAULT_ANTHROPIC_MODEL),
+        "openai_model": os.getenv("OPENAI_MODEL") or None,
         "local_model": (os.getenv("LLM_MODEL") or "llama3.1") if os.getenv("LLM_BASE_URL") else None,
     }

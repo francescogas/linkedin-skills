@@ -40,6 +40,7 @@ Set `LLM_CHAIN` (comma list, tried in order) or let it follow what is configured
 | Mode | Settings |
 |---|---|
 | Anthropic API | `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL` |
+| OpenAI | `OPENAI_API_KEY` and `OPENAI_MODEL` (no default: you name the model), optional `OPENAI_BASE_URL` |
 | Private cloud | `ANTHROPIC_BASE_URL` pointing at your Messages-API gateway |
 | Local / air-gapped | `LLM_BASE_URL` (Ollama, LM Studio, vLLM; OpenAI-compatible), `LLM_MODEL` |
 | Cloud with local fallback | `LLM_CHAIN=anthropic,local` (a dropped network falls through to the local model) |
