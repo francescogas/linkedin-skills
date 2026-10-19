@@ -67,6 +67,8 @@ class Orchestrator:
     def enqueue(self, workflow: str, profile_id: Optional[int], input_text: str = "", schedule_id: Optional[int] = None) -> int:
         if workflow not in WORKFLOWS:
             raise KeyError(f"unknown workflow: {workflow}")
+        if profile_id is not None and not self.store.get("profiles", profile_id):
+            raise KeyError(f"profile {profile_id} not found (list them with: lstudio profiles)")
         now = time.time()
         return self.store.insert("jobs", workflow=workflow, profile_id=profile_id, input=input_text,
                                  status="queued", steps=[], schedule_id=schedule_id, created=now, updated=now)

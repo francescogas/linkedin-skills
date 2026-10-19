@@ -114,7 +114,8 @@ def main(argv: list[str], ctl: Ctl, confirm=input) -> int:
         P(f"queued job #{jid}")
         if not a.no_wait:
             ctl.show_job(ctl.wait(jid, a.timeout))
-            P("\nDrafts waiting: lstudio drafts")
+            if any(x["job_id"] == jid and x["status"] == "pending" for x in ctl.call("GET", "/api/drafts")):
+                P("\nDrafts waiting: lstudio drafts")
     elif a.cmd == "jobs":
         for x in ctl.call("GET", "/api/jobs"):
             ctl.show_job(x, full=False)

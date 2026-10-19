@@ -212,6 +212,12 @@ class Api(unittest.TestCase):
         self.assertEqual(self.call(f"/api/drafts/{reply}/image", "POST", {"prompt": "x"})[0], 400)
         self.assertEqual(self.call(f"/api/drafts/{post}/image", "POST", {"prompt": " "})[0], 400)
 
+    def test_unknown_profile_is_an_error_not_a_silent_run_without_profile(self):
+        code, r = self.call("/api/jobs", "POST", {"workflow": "profile_makeover", "profile_id": 99})
+        self.assertEqual(code, 404)
+        self.assertIn("profile 99 not found", r["error"])
+        self.assertEqual(self.store.list("jobs"), [])
+
     def test_unknown_workflow(self):
         self.assertEqual(self.call("/api/jobs", "POST", {"workflow": "nope"})[0], 404)
 
